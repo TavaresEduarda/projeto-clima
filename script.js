@@ -1,49 +1,86 @@
-let cidadeInput = document.getElementById("cidadeinput");
-let buscarButton = document.getElementById("buscarButton");
+const cityInput = document.getElementById("cityInput");
+const searchButton = document.getElementById("searchButton");
 
-let cidadeEl = document.querySelector(".card-title");
-let temperaturaEl = document.querySelector(".temp");
-let umidadeEl = document.querySelector(".umidade");
-let mensagemEl = document.querySelector(".mensagem");
-let iconeEl = document.querySelector(".clima-icon");
+const cityEl = document.querySelector(".card-title");
+const temperatureEl = document.querySelector(".temp");
+const humidityEl = document.querySelector(".humidity");
+const messageEl = document.querySelector(".message");
+const iconEl = document.querySelector(".weather-icon");
 
-buscarButton.addEventListener("click", buscarClima);
+searchButton.addEventListener("click", fetchWeather);
 
-let API_KEY = "d35bfd4afdb2c5f167db19d1e1ae0275";
+// Cidade padrão ao carregar
+window.addEventListener("DOMContentLoaded", () => {
+  cityInput.value = "Gravataí";
+  fetchWeather();
+});
 
-function buscarClima() {
-    const cidade = cidadeInput.value;
+function fetchWeather() {
+  const city = cityInput.value.trim();
 
-    if (cidade === "") {
-        alert("Digite uma cidade");
+  if (city === "") {
+    alert("Digite o nome de uma cidade");
+    return;
+  }
+
+  // Geocoding API
+  const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=pt`;
+
+  fetch(geoUrl)
+    .then(response => response.json())
+    .then(geo => {
+      if (!geo.results) {
+        alert("Cidade não encontrada");
         return;
-    }
+      }
 
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${cidade}&appid=${API_KEY}&units=metric&lang=pt_br`;
+      const latitude = geo.results[0].latitude;
+      const longitude = geo.results[0].longitude;
+      const cityName = geo.results[0].name;
 
-    fetch(url)
+      // Weather API
+      const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=relativehumidity_2m`;
+
+      fetch(weatherUrl)
         .then(response => response.json())
-        .then(dados => {
-            mostrarDados(dados);
-        })
-        .catch(() => {
-            alert("Erro ao buscar a cidade");
+        .then(weather => {
+          cityEl.innerText = cityName;
+          temperatureEl.innerText = `${Math.round(weather.current_weather.temperature)} °C`;
+
+          const humidity = weather.hourly.relativehumidity_2m[0];
+          humidityEl.innerText = `Umidade: ${humidity}%`;
+
+          let message = "";
+
+          if (weather.current_weather.weathercode >= 51 && weather.current_weather.weathercode <= 67) {
+            message = "🌧️ Vai chover! Leve um guarda-chuva.";
+          } else if (weather.current_weather.temperature < 15) {
+            message = "Está frio! Use casaco e roupas quentes. 🧥";
+          } else if (weather.current_weather.temperature < 25) {
+            message = "Clima agradável! Use roupas leves.";
+          } else {
+            message = "Está quente! Use roupas leves e hidrate-se. 🥵";
+          }
+
+          messageEl.innerText = message;
+
+          const code = weather.current_weather.weathercode;
+
+          if (code === 0) {
+            iconEl.src = "https://cdn-icons-png.flaticon.com/512/869/869869.png";
+          } else if (code <= 3) {
+            iconEl.src = "https://cdn-icons-png.flaticon.com/512/1163/1163661.png";
+          } else if (code <= 48) {
+            iconEl.src = "https://cdn-icons-png.flaticon.com/512/4005/4005901.png";
+          } else if (code <= 67) {
+            iconEl.src = "https://cdn-icons-png.flaticon.com/512/3076/3076129.png";
+          } else {
+            iconEl.src = "https://cdn-icons-png.flaticon.com/512/1779/1779940.png";
+          }
         });
-}
-
-function mostrarDados(dados) {
-    cidadeEl.textContent = dados.name;
-    temperaturaEl.textContent = `${Math.round(dados.main.temp)}°C`;
-    umidadeEl.textContent = `Umidade: ${dados.main.humidity}%`;
-
-    const icone = dados.weather[0].icon;
-    iconeEl.src = `https://openweathermap.org/img/wn/${icone}@2x.png`;
-
-    if (dados.main.temp < 18) {
-        mensagemEl.textContent = "Está frio! Leve um casaco 🧥";
-    } else if (dados.main.temp < 25) {
-        mensagemEl.textContent = "Clima agradável 🙂";
-    } else {
-        mensagemEl.textContent = "Está quente! Hidrate-se 🥵";
-    }
+    })
+    .catch(error => {
+      console.error("Erro ao buscar clima", error);
+      messageEl.innerText = "Erro ao carregar os dados";
+    });
 }
